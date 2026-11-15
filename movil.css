@@ -1,0 +1,33 @@
+/* Ajustes para iPhone: barra de pestañas abajo, zonas seguras y botones grandes */
+body { padding-top: env(safe-area-inset-top); -webkit-text-size-adjust: 100%; }
+input, select, textarea { font-size: 16px; } /* evita el zoom automático de Safari */
+@media (max-width: 760px) {
+  :root { font-size: 15px; }
+  .barra { position: sticky; top: 0; padding: 8px 14px; }
+  .barra .marca span { font-size: 17px; }
+  nav#pestanas { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: #fff; border-top: 1px solid var(--borde);
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; padding: 4px 2px calc(4px + env(safe-area-inset-bottom)); }
+  nav#pestanas button { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 0; border-radius: 10px; position: relative; min-width: 0; }
+  nav#pestanas button .ico { font-size: 21px; margin: 0; line-height: 1.1; }
+  nav#pestanas button .txt { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  nav#pestanas .badge { position: absolute; top: 0; right: 6px; font-size: 10px; padding: 0 5px; }
+  main { padding: 14px 12px calc(90px + env(safe-area-inset-bottom)); }
+  h1 { font-size: 22px; }
+  .busqueda { flex-direction: column; align-items: stretch; }
+  .busqueda-der { align-items: stretch; }
+  button.grande { width: 100%; }
+  .kpis { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .kpi { padding: 10px 12px; } .kpi .v { font-size: 21px; }
+  .filtros { gap: 8px; } .filtros select, .filtros input[type=search] { flex: 1 1 100%; }
+  .rejilla { grid-template-columns: 1fr; }
+  .carta .foto { height: 210px; }
+  .fila-cabecera { align-items: stretch; flex-direction: column; }
+  .modal { padding: 0; }
+  .modal-caja { border-radius: 0; min-height: 100vh; padding: calc(14px + env(safe-area-inset-top)) 14px calc(30px + env(safe-area-inset-bottom)); }
+  .cerrar { top: calc(10px + env(safe-area-inset-top)); position: fixed; z-index: 5; }
+  .galeria .principal { height: 300px; }
+  .en-linea { flex-wrap: wrap; } .en-linea > * { flex: 1 1 140px; }
+  .tarjeta.sin-pad { -webkit-overflow-scrolling: touch; }
+  .tabla { font-size: 13px; }
+  .toast { bottom: calc(80px + env(safe-area-inset-bottom)); width: max-content; max-width: 92vw; }
+}

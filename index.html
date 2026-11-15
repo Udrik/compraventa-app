@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CompraVenta</title>
+<link rel="icon" href="icono.svg">
+<link rel="stylesheet" href="app.css">
+<meta name="theme-color" content="#0f766e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="CompraVenta">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="movil.css">
+
+</head>
+<body>
+<header class="barra">
+  <div class="marca"><img src="icono.svg" alt="" width="28" height="28"><span>CompraVenta</span></div>
+  <nav id="pestanas">
+    <button data-tab="inicio" class="activa"><span class="ico">🏠</span><span class="txt">Inicio</span></button>
+    <button data-tab="ofertas"><span class="ico">🔥</span><span class="txt">Oportunidades</span> <span id="badge-ofertas" class="badge oculto"></span></button>
+    <button data-tab="precios"><span class="ico">📊</span><span class="txt">Precios</span></button>
+    <button data-tab="calc"><span class="ico">🧮</span><span class="txt">Calculadora</span></button>
+    <button data-tab="ops"><span class="ico">📦</span><span class="txt">Mis operaciones</span></button>
+    <button data-tab="ajustes"><span class="ico">⚙️</span><span class="txt">Ajustes</span></button>
+    <button data-tab="ayuda"><span class="ico">❓</span><span class="txt">Ayuda</span></button>
+  </nav>
+  <button id="btn-salir" class="sec peq" title="Cerrar el programa">⏻ Salir</button>
+</header>
+
+<main>
+<!-- ============ INICIO ============ -->
+<section id="tab-inicio" class="tab activa">
+  <div class="fila-cabecera">
+    <div>
+      <h1>Buenos días 👋</h1>
+      <p class="sub" id="txt-ubicacion"></p>
+    </div>
+  </div>
+
+  <div class="tarjeta busqueda">
+    <div class="busqueda-izq">
+      <h2>Buscar ofertas en Wallapop</h2>
+      <p class="sub" id="txt-estimado">Descarga los anuncios de todos los modelos activos, calcula precios de referencia y comprueba cada candidato.</p>
+      <div id="progreso" class="oculto">
+        <div class="barra-prog"><div id="prog-relleno"></div></div>
+        <div class="prog-texto"><b id="prog-fase"></b> <span id="prog-detalle"></span></div>
+        <details><summary>Ver detalle</summary><pre id="prog-log"></pre></details>
+      </div>
+      <div id="aviso-tarea" class="aviso oculto"></div>
+    </div>
+    <div class="busqueda-der">
+      <button id="btn-buscar" class="grande">🔍 Buscar ofertas ahora</button>
+      <button id="btn-cancelar" class="sec oculto">Cancelar</button>
+      <button id="btn-reanalizar" class="enlace" title="Vuelve a calcular con los anuncios ya descargados (útil tras cambiar ajustes)">↻ Solo recalcular (sin descargar)</button>
+    </div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="dos-col">
+    <div class="tarjeta">
+      <h3>🏆 Mejores oportunidades ahora</h3>
+      <div id="top"></div>
+      <button class="enlace" data-ir="ofertas">Ver todas →</button>
+    </div>
+    <div class="tarjeta">
+      <h3>⏰ Búsqueda diaria automática</h3>
+      <p class="sub">Windows buscará ofertas cada día a la hora que elijas, aunque no abras el programa. Al abrirlo verás las nuevas marcadas con 🆕.</p>
+      <div id="prog-diaria"></div>
+      <h3 class="mt">📌 Rutina recomendada</h3>
+      <ol class="pasos">
+        <li>Busca ofertas (o deja que lo haga la búsqueda diaria).</li>
+        <li>Abre <b>Oportunidades</b> y empieza por las 🆕 y las ⏳ pendientes de revisar.</li>
+        <li>Mira las fotos de cada una y márcala como <b>✅ correcta</b> o <b>❌ descartada</b>.</li>
+        <li>Escribe al vendedor con el mensaje sugerido y queda en persona.</li>
+        <li>Cuando compres, pulsa <b>📦 Añadir a mis operaciones</b> para llevar tus cuentas.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- ============ OPORTUNIDADES ============ -->
+<section id="tab-ofertas" class="tab">
+  <div class="fila-cabecera">
+    <div><h1>Oportunidades</h1><p class="sub" id="txt-ofertas"></p></div>
+    <div class="seg" id="vista-ofertas">
+      <button data-v="activas" class="activa">Activas</button>
+      <button data-v="descartadas">Descartadas</button>
+    </div>
+  </div>
+  <div class="filtros tarjeta">
+    <input id="f-texto" type="search" placeholder="Buscar: iPhone, PS5, Terrassa…">
+    <select id="f-cat"><option value="">Todas las categorías</option></select>
+    <select id="f-orden">
+      <option value="beneficio">Más beneficio</option>
+      <option value="margen">Más % de margen</option>
+      <option value="precio">Más baratas</option>
+      <option value="km">Más cercanas</option>
+      <option value="nuevo">Nuevas primero</option>
+    </select>
+    <label class="chk"><input type="checkbox" id="f-local"> Solo cerca</label>
+    <label class="chk"><input type="checkbox" id="f-nuevas"> Solo 🆕</label>
+    <label class="chk"><input type="checkbox" id="f-pend"> Solo ⏳ por revisar</label>
+    <label class="rango">Beneficio mín. <input type="range" id="f-ben" min="0" max="300" step="10" value="0"><b id="f-ben-v">0 €</b></label>
+  </div>
+  <div id="lista-ofertas" class="rejilla"></div>
+</section>
+
+<!-- ============ PRECIOS ============ -->
+<section id="tab-precios" class="tab">
+  <div class="fila-cabecera">
+    <div><h1>Precios de referencia</h1>
+      <p class="sub">Calculados con los anuncios de unidades usadas que funcionan (sin valores atípicos). <b>Compra máx.</b> es el precio por debajo del cual comprar deja tu margen mínimo. Pulsa una fila para abrirla en la calculadora.</p></div>
+    <input id="p-texto" type="search" placeholder="Filtrar modelo…">
+  </div>
+  <div class="tarjeta sin-pad"><table class="tabla" id="tabla-precios"></table></div>
+</section>
+
+<!-- ============ CALCULADORA ============ -->
+<section id="tab-calc" class="tab">
+  <h1>Calculadora de compra</h1>
+  <p class="sub">¿Has visto algo en Wallapop? Comprueba aquí si te compensa antes de escribir al vendedor.</p>
+  <div class="dos-col">
+    <form class="tarjeta formulario" id="form-calc">
+      <label>Modelo<select name="grupo" id="c-grupo" required></select></label>
+      <label>Precio del anuncio (€)<input name="precio" type="number" min="1" step="1" required placeholder="Ej. 250"></label>
+      <label>Estado según la descripción
+        <select name="estado">
+          <option value="usado">Funciona bien (usado)</option>
+          <option value="nuevo">Nuevo / precintado</option>
+          <option value="pantalla_rota">Pantalla rota (solo móviles)</option>
+          <option value="trasera_rota">Trasera rota (solo iPhone Pro)</option>
+        </select></label>
+      <label>Estado que marca Wallapop
+        <select name="condicion">
+          <option value="">No lo sé</option>
+          <option value="new">Nuevo</option>
+          <option value="as_good_as_new">Como nuevo</option>
+          <option value="good">En buen estado</option>
+          <option value="fair">En condiciones aceptables</option>
+          <option value="has_given_it_all">Lo ha dado todo</option>
+        </select></label>
+      <label>Salud de batería (%) <small>solo móviles, opcional</small><input name="bateria" type="number" min="50" max="100" placeholder="Ej. 86"></label>
+      <label class="chk"><input type="checkbox" name="local" checked> Lo recojo en persona (sin envío)</label>
+      <div><button type="submit" class="grande">🧮 Calcular</button></div>
+    </form>
+    <div class="tarjeta" id="res-calc"><p class="sub">Rellena el formulario y pulsa Calcular.</p></div>
+  </div>
+</section>
+
+<!-- ============ OPERACIONES ============ -->
+<section id="tab-ops" class="tab">
+  <div class="fila-cabecera">
+    <div><h1>Mis operaciones</h1><p class="sub">Lleva el control de lo que compras, lo que inviertes en reparaciones y lo que ganas al vender.</p></div>
+    <div><button id="btn-nueva-op">＋ Nueva operación</button> <a class="boton sec" href="/api/exportar_operaciones">⬇ Exportar a Excel (CSV)</a></div>
+  </div>
+  <div class="kpis" id="kpis-ops"></div>
+  <div class="seg mb" id="filtro-ops">
+    <button data-v="" class="activa">Todas</button>
+    <button data-v="En stock">En stock</button>
+    <button data-v="En reparación">En reparación</button>
+    <button data-v="A la venta">A la venta</button>
+    <button data-v="Vendido">Vendidas</button>
+  </div>
+  <div class="tarjeta sin-pad"><table class="tabla" id="tabla-ops"></table></div>
+</section>
+
+<!-- ============ AJUSTES ============ -->
+<section id="tab-ajustes" class="tab">
+  <div class="fila-cabecera">
+    <div><h1>Ajustes</h1><p class="sub">Los cambios se aplican en la próxima búsqueda. Para recalcular con los anuncios ya descargados usa «Solo recalcular» en Inicio.</p></div>
+    <div><button id="btn-guardar-aj">💾 Guardar ajustes</button> <button id="btn-restablecer" class="sec">Restablecer valores</button></div>
+  </div>
+  <div class="dos-col">
+    <div class="tarjeta formulario">
+      <h3>📍 Tu zona</h3>
+      <label>Población<span class="en-linea"><input id="aj-pueblo" placeholder="Ej. Esparreguera"><button type="button" id="btn-geo" class="sec">Buscar</button></span></label>
+      <div id="geo-res"></div>
+      <div class="en-linea">
+        <label>Latitud<input id="aj-LAT" type="number" step="0.0001"></label>
+        <label>Longitud<input id="aj-LON" type="number" step="0.0001"></label>
+      </div>
+      <label>Radio para compras en persona (km)<input id="aj-RADIO_LOCAL_KM" type="number" min="1" max="200"></label>
+      <h3 class="mt">🔎 Búsqueda</h3>
+      <label>Páginas por búsqueda (40 anuncios cada una)<input id="aj-PAGINAS" type="number" min="1" max="10"><small id="aj-tiempo"></small></label>
+      <h3 class="mt">💶 Cuándo es una oportunidad</h3>
+      <div class="en-linea">
+        <label>Beneficio mínimo en tu zona (€)<input id="aj-MARGEN_MIN_LOCAL" type="number"></label>
+        <label>y margen mínimo (%)<input id="aj-MARGEN_MIN_PCT_LOCAL" type="number" data-pct="1"></label>
+      </div>
+      <div class="en-linea">
+        <label>Beneficio mínimo con envío (€)<input id="aj-MARGEN_MIN_ENVIO" type="number"></label>
+        <label>y margen mínimo (%)<input id="aj-MARGEN_MIN_PCT_ENVIO" type="number" data-pct="1"></label>
+      </div>
+      <div class="en-linea">
+        <label>Coste de envío estimado (€)<input id="aj-COSTE_ENVIO" type="number"></label>
+        <label>Vendes al … % de la mediana<input id="aj-DESCUENTO_REVENTA" type="number" data-pct="1"></label>
+      </div>
+      <h3 class="mt">🔋 Batería</h3>
+      <div class="en-linea">
+        <label>Cambiar batería si baja de (%)<input id="aj-BATERIA_MIN" type="number"></label>
+        <label>Coste batería iPhone (€)<input id="aj-BATERIA_IPHONE" type="number"></label>
+        <label>Coste batería Samsung (€)<input id="aj-BATERIA_SAMSUNG" type="number"></label>
+      </div>
+      <h3 class="mt">📁 Datos</h3>
+      <p class="sub" id="txt-carpeta"></p>
+      <button type="button" class="sec" id="btn-carpeta">Abrir carpeta de datos</button>
+    </div>
+    <div>
+      <div class="tarjeta">
+        <h3>🛠️ Costes de reparación</h3>
+        <p class="sub">Se usa el más barato disponible. Deja vacío si no lo sabes.</p>
+        <table class="tabla compacta" id="tabla-rep"></table>
+      </div>
+      <div class="tarjeta">
+        <h3>📱 Modelos que se buscan</h3>
+        <p class="sub">Desactiva los que no te interesen: la búsqueda irá más rápida.</p>
+        <div id="lista-grupos"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AYUDA ============ -->
+<section id="tab-ayuda" class="tab">
+  <h1>Ayuda</h1>
+  <div class="dos-col">
+    <div class="tarjeta texto">
+      <h3>¿Cómo decide si algo es una oportunidad?</h3>
+      <ol>
+        <li><b>Descarga</b> miles de anuncios de Wallapop por cada modelo: los más cercanos, los más recientes de tu zona y los más recientes de toda España.</li>
+        <li><b>Limpia</b>: quita accesorios, piezas sueltas, anuncios de talleres, réplicas, reservados y republicados.</li>
+        <li><b>Lee el estado</b> en el texto: nuevo, usado, pantalla rota, trasera rota, averiado, bloqueado por iCloud, % de batería…</li>
+        <li><b>Calcula el precio de referencia</b> de cada modelo: la mediana de las unidades usadas que funcionan.</li>
+        <li><b>Calcula tu beneficio</b>: reventa (mediana × % de reventa, ajustada por estado) − precio − reparaciones − envío.</li>
+        <li><b>Comprueba la ficha</b> de cada candidato en Wallapop: estado oficial, modelo, país, si sigue disponible y cuántas conversaciones tiene.</li>
+        <li><b>Tú revisas las fotos</b> y lo marcas como correcto o descartado. El programa lo recuerda.</li>
+      </ol>
+      <h3>Iconos</h3>
+      <ul class="leyenda">
+        <li>🆕 Apareció desde la búsqueda anterior</li>
+        <li>📉 Ha bajado de precio</li>
+        <li>⏳ Fotos pendientes de revisar</li>
+        <li>⚠️ Más de 300 conversaciones a precio muy bajo: posible anuncio cebo</li>
+        <li>📍 En tu zona · 📦 Con envío</li>
+      </ul>
+    </div>
+    <div class="tarjeta texto">
+      <h3>✅ Antes de pagar</h3>
+      <ul>
+        <li><b>Paga siempre dentro de Wallapop</b> o en mano al recoger. Nunca por Bizum o transferencia a desconocidos.</li>
+        <li><b>Móviles</b>: comprueba que no tiene iCloud / cuenta Google, mira el IMEI (*#06#) y que coincide con la caja, revisa la salud de la batería, Face ID / huella, cámaras, altavoces, micrófono y carga.</li>
+        <li><b>Consolas</b>: enciéndela, prueba un juego, los mandos y el lector de discos. Pide ver que no está baneada.</li>
+        <li><b>Patinetes</b>: pide los km, prueba frenos, luces y la batería en una cuesta. Comprueba que el número de serie no está borrado.</li>
+        <li><b>Zapatillas</b>: desconfía de precios muy bajos en modelos de moda: suelen ser réplicas.</li>
+        <li>Pide factura si la hay: se vende mejor y demuestra la procedencia.</li>
+      </ul>
+      <h3>Limitaciones</h3>
+      <ul>
+        <li>Los precios de referencia son de <b>anuncios</b>, no de ventas cerradas.</li>
+        <li>Solo Wallapop. Vinted bloquea el acceso automatizado.</li>
+        <li>El estado se deduce del texto: revisa siempre las fotos.</li>
+        <li>Los costes de reparación son tarifas publicadas por talleres: pide presupuesto.</li>
+      </ul>
+      <p class="sub" id="txt-version"></p>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- Ventana de detalle -->
+<div id="modal" class="modal oculto" role="dialog" aria-modal="true">
+  <div class="modal-caja">
+    <button class="cerrar" data-cerrar>✕</button>
+    <div id="modal-cuerpo"></div>
+  </div>
+</div>
+<div id="toast" class="toast oculto"></div>
+<script src="motor.js"></script>
+<script src="app.js"></script>
+<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");</script>
+</body>
+</html>
