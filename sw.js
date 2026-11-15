@@ -1,6 +1,6 @@
 // Guarda la app en el iPhone para que abra al instante y sin conexión.
 // Las consultas a Wallapop no se guardan: siempre van a Internet.
-const CACHE = "compraventa-1.1.0";
+const CACHE = "compraventa-1.1.1";
 const ARCHIVOS = ["./", "index.html", "app.css", "movil.css", "app.js", "motor.js", "config.json", "icono.svg",
   "apple-touch-icon.png", "icono-192.png", "icono-512.png", "manifest.webmanifest"];
 

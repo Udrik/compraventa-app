@@ -136,3 +136,4 @@ textarea { min-height: 70px; }
 .carta .foto img[src$="icono.svg"], .top-item img[src$="icono.svg"] { object-fit: contain; padding: 30px; background: var(--pri-claro); }
 .top-item img[src$="icono.svg"] { padding: 10px; }
 .desglose td:last-child { white-space: nowrap; }
+.dos-col > *, .en-linea > * { min-width: 0; }

@@ -22,6 +22,7 @@
   <nav id="pestanas">
     <button data-tab="inicio" class="activa"><span class="ico">🏠</span><span class="txt">Inicio</span></button>
     <button data-tab="ofertas"><span class="ico">🔥</span><span class="txt">Oportunidades</span> <span id="badge-ofertas" class="badge oculto"></span></button>
+    <button data-tab="vigilante" id="tab-btn-vigilante"><span class="ico">🔔</span><span class="txt">Vigilante</span> <span id="badge-vig" class="badge oculto"></span></button>
     <button data-tab="precios"><span class="ico">📊</span><span class="txt">Precios</span></button>
     <button data-tab="calc"><span class="ico">🧮</span><span class="txt">Calculadora</span></button>
     <button data-tab="ops"><span class="ico">📦</span><span class="txt">Mis operaciones</span></button>
@@ -108,6 +109,58 @@
     <label class="rango">Beneficio mín. <input type="range" id="f-ben" min="0" max="300" step="10" value="0"><b id="f-ben-v">0 €</b></label>
   </div>
   <div id="lista-ofertas" class="rejilla"></div>
+</section>
+
+<!-- ============ VIGILANTE ============ -->
+<section id="tab-vigilante" class="tab">
+  <div class="fila-cabecera">
+    <div><h1>Vigilante</h1>
+      <p class="sub">Mira cada pocos minutos los anuncios <b>recién publicados</b> de los modelos que elijas y te avisa al momento por Telegram si alguno es una ganga. Analiza solo lo nuevo, con los mismos criterios que la búsqueda completa.</p></div>
+  </div>
+  <div class="dos-col">
+    <div>
+      <div class="tarjeta" id="vig-estado"></div>
+      <div class="tarjeta">
+        <h3>📲 Avisos en el móvil con Telegram</h3>
+        <div id="tg-estado"></div>
+        <ol class="pasos" id="tg-pasos">
+          <li>Instala <b>Telegram</b> en el móvil (iPhone o Android) y entra con tu número.</li>
+          <li>Busca <b>@BotFather</b> (el oficial, con la marca azul ✔), pulsa <b>Iniciar</b> y escribe <code>/newbot</code>.</li>
+          <li>Ponle un nombre (p. ej. <i>Mis gangas</i>) y un usuario que acabe en <b>bot</b> (p. ej. <i>misgangas_ruben_bot</i>).</li>
+          <li>BotFather te da un <b>token</b> (algo como <code>123456789:AAH…</code>). Cópialo y pégalo aquí:
+            <div class="en-linea mt"><input id="tg-token" placeholder="Pega aquí el token" autocomplete="off"><button id="btn-tg-token">Guardar</button></div></li>
+          <li>Abre tu bot nuevo en Telegram (BotFather te da el enlace) y pulsa <b>Iniciar</b>. Después pulsa aquí:
+            <div class="mt"><button id="btn-tg-conectar">🔗 Conectar con mi Telegram</button></div></li>
+        </ol>
+        <p class="sub">El token se guarda solo en este ordenador. No lo compartas: quien lo tenga puede escribir con tu bot.</p>
+      </div>
+    </div>
+    <div>
+      <div class="tarjeta formulario">
+        <h3>⚙️ Cómo vigila</h3>
+        <div class="en-linea">
+          <label>Mirar cada
+            <select id="vig-intervalo"><option value="60">1 minuto</option><option value="120">2 minutos</option><option value="180">3 minutos</option>
+              <option value="300">5 minutos</option><option value="600">10 minutos</option><option value="900">15 minutos</option></select></label>
+          <div id="vig-carga" class="sub"></div>
+        </div>
+        <label class="chk"><input type="checkbox" id="vig-envios"> Vigilar también anuncios con envío de toda España (duplica las consultas)</label><br>
+        <label class="chk"><input type="checkbox" id="vig-auto"> Arrancar el vigilante al abrir CompraVenta</label><br>
+        <label class="chk" id="lbl-vig-windows"><input type="checkbox" id="vig-windows"> Arrancar el vigilante al encender el ordenador (en segundo plano, sin ventana)</label>
+        <p class="sub">Menos minutos = te enteras antes, pero más consultas a Wallapop y más riesgo de que limite tu conexión. Recomendado: 3 minutos y solo los modelos que te interesan.</p>
+        <h3 class="mt">📱 Modelos a vigilar</h3>
+        <p class="sub" id="vig-modelos-txt"></p>
+        <div class="acciones"><button class="sec peq" id="vig-rentables">Solo los rentables</button><button class="sec peq" id="vig-ninguno">Quitar todos</button></div>
+        <div id="vig-modelos"></div>
+        <div class="acciones"><button id="btn-vig-guardar">💾 Guardar</button></div>
+      </div>
+    </div>
+  </div>
+  <div class="fila-cabecera mt">
+    <div><h2>🔔 Últimos avisos</h2><p class="sub" id="vig-avisos-txt"></p></div>
+    <button class="sec peq" id="btn-vig-borrar">Borrar lista</button>
+  </div>
+  <div id="vig-avisos" class="rejilla"></div>
 </section>
 
 <!-- ============ PRECIOS ============ -->

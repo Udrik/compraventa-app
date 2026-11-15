@@ -39,11 +39,12 @@ function irA(tab) {
   $$("#pestanas button").forEach((b) => b.classList.toggle("activa", b.dataset.tab === tab));
   $$(".tab").forEach((s) => s.classList.toggle("activa", s.id === "tab-" + tab));
   window.scrollTo(0, 0);
-  ({ inicio: cargarInicio, ofertas: cargarOfertas, precios: cargarPrecios, calc: cargarCalc, ops: cargarOps, ajustes: cargarAjustes }[tab] || (() => {}))();
+  ({ inicio: cargarInicio, ofertas: cargarOfertas, vigilante: cargarVigilante, precios: cargarPrecios, calc: cargarCalc, ops: cargarOps, ajustes: cargarAjustes }[tab] || (() => {}))();
 }
 $$("#pestanas button").forEach((b) => b.addEventListener("click", () => irA(b.dataset.tab)));
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-ir]"); if (b) irA(b.dataset.ir); });
 if (MOVIL) {
+  $("#tab-btn-vigilante").classList.add("oculto");  // el vigilante funciona en el programa de Windows
   $("#btn-salir").classList.add("oculto");
   $("#btn-reanalizar").classList.add("oculto");
   const exp = $('a[href="/api/exportar_operaciones"]');
@@ -123,7 +124,7 @@ function pintarInicio() {
     <div class="top-item" data-id="${esc(o.id)}">
       <img src="${esc(o.foto || "icono.svg")}" alt="" loading="lazy" onerror="this.src='icono.svg'">
       <div class="t"><b>${o.nuevo ? "🆕 " : ""}${esc(o.titulo)}</b><span class="sub">${eur(o.precio)} · ${o.local ? "📍 " + esc(o.ciudad) + " (" + Math.round(o.km) + " km)" : "📦 envío"}</span></div>
-      <span class="pos">+${eur(o.beneficio)}</span>
+      <span class="pos">${o.beneficio >= 0 ? "+" : ""}${eur(o.beneficio)}</span>
     </div>`).join("") : `<p class="sub">Sin oportunidades por ahora.</p>`;
   $$("#top .top-item").forEach((el) => el.addEventListener("click", () => detalle(OPS.find((o) => o.id === el.dataset.id))));
   pintarProgramacion();
@@ -207,7 +208,7 @@ function textoEstado(o) {
 function carta(o) {
   return `<div class="carta" data-id="${esc(o.id)}">
     <div class="foto"><img src="${esc(o.foto || "icono.svg")}" alt="" loading="lazy" onerror="this.src='icono.svg'">
-      <div class="etiquetas">${etiquetas(o)}</div><div class="ben">+${eur(o.beneficio)} · ${o.margen_pct} %</div></div>
+      <div class="etiquetas">${etiquetas(o)}</div><div class="ben">${o.beneficio >= 0 ? "+" : ""}${eur(o.beneficio)} · ${o.margen_pct} %</div></div>
     <div class="cuerpo">
       <span class="cat">${CATS[o.categoria] || o.categoria} · ${esc(o.grupo)}</span>
       <div class="tit">${esc(o.titulo)}</div>
@@ -254,7 +255,7 @@ async function detalle(o) {
           <tr><td><b>Coste total</b></td><td>${eur(o.coste_total)}</td></tr>
           <tr><td>Precio típico (mediana de ${esc(o.grupo)} usados)</td><td>${eur(o.reventa_base)}</td></tr>
           <tr><td>Reventa estimada (para vender rápido, según estado)</td><td>${eur(o.precio_reventa)}</td></tr>
-          <tr class="total"><td>Beneficio</td><td class="pos">+${eur(o.beneficio)} (${o.margen_pct} %)</td></tr>
+          <tr class="total"><td>Beneficio</td><td class="pos">${o.beneficio >= 0 ? "+" : ""}${eur(o.beneficio)} (${o.margen_pct} %)</td></tr>
         </table>
         <p class="sub">Estado: <b>${esc(textoEstado(o))}</b>${o.bateria ? ` · batería ${o.bateria} %` : ""} · ${o.local ? `📍 ${esc(o.ciudad)}, a ${Math.round(o.km)} km` : `📦 envío desde ${esc(o.ciudad)}`} · ${o.conversaciones ?? "?"} conversaciones</p>
         <div class="acciones">
@@ -287,7 +288,7 @@ async function detalle(o) {
   $("#b-op").addEventListener("click", () => { cerrarModal(); irA("ops"); formOperacion({ articulo: o.titulo, categoria: CATS[o.categoria] || o.categoria, estado: "En stock",
     fecha_compra: new Date().toISOString().slice(0, 10), precio_compra: o.precio, gastos: (o.reparacion || 0) + (o.envio || 0), url: o.url,
     notas: `Reventa estimada ${o.precio_reventa} €` }); });
-  const revisar = async (cuerpo, msg) => { try { await api("/api/revision", { clave: o.clave, ...cuerpo }); toast(msg); cerrarModal(); await cargarDatos(); pintarOfertas(); pintarInicio(); } catch (e) { error(e); } };
+  const revisar = async (cuerpo, msg) => { try { await api("/api/revision", { clave: o.clave, ...cuerpo }); toast(msg); cerrarModal(); await cargarDatos(); pintarOfertas(); pintarInicio(); if ($("#tab-vigilante").classList.contains("activa")) cargarVigilante(); } catch (e) { error(e); } };
   $("#b-ok")?.addEventListener("click", () => revisar({ excluir: false, nota: $("#t-nota").value || "Revisado: fotos correctas" }, "Marcado como revisado ✅"));
   $("#b-descartar")?.addEventListener("click", () => {
     const motivo = [$("#s-motivo").value, $("#t-nota").value].filter(Boolean).join(". ");
@@ -496,6 +497,111 @@ $("#btn-geo").addEventListener("click", async () => {
 $("#btn-carpeta").addEventListener("click", async () => {
   if (MOVIL) { try { await window.MOTOR.exportarCopia(); } catch (e) { if (e.name !== "AbortError") error(e); } return; }
   try { await api("/api/abrir_carpeta", {}); } catch (e) { toast(e.message, 8000); }
+});
+
+// ===================================================================
+// Vigilante
+// ===================================================================
+let VIG = null, sondeoVig = null, vigEditando = false;
+async function cargarVigilante() {
+  if (MOVIL) return;
+  try { VIG = await api("/api/vigilante"); } catch (e) { return error(e); }
+  pintarVigilante();
+  clearTimeout(sondeoVig);
+  if ($("#tab-vigilante").classList.contains("activa")) sondeoVig = setTimeout(refrescarVigilante, 5000);
+}
+async function refrescarVigilante() {
+  if (!$("#tab-vigilante").classList.contains("activa")) return;
+  try { VIG = await api("/api/vigilante"); pintarEstadoVig(); pintarAvisos(); } catch {}
+  sondeoVig = setTimeout(refrescarVigilante, 5000);
+}
+function pintarVigilante() { pintarEstadoVig(); pintarTelegram(); if (!vigEditando) pintarConfigVig(); pintarAvisos(); }
+function pintarEstadoVig() {
+  const e = VIG.estado, tg = VIG.telegram;
+  const avisoTg = tg.conectado ? "" : `<p class="aviso">Telegram no está conectado: los avisos solo se verán aquí. Conéctalo abajo.</p>`;
+  $("#vig-estado").innerHTML = `
+    <div class="en-linea" style="align-items:center">
+      <div><h2 style="margin:0">${e.activo ? "🟢 Vigilando" : "⚪ Parado"}</h2>
+        <p class="sub" style="margin:4px 0 0">${e.activo ? `Desde ${fecha(e.inicio)} · ${e.vueltas} vueltas · ${e.nuevos} anuncios nuevos analizados · ${e.avisos} avisos` : "Pulsa «Empezar a vigilar»."}</p></div>
+      <div style="flex:0 0 auto">${e.activo ? `<button class="sec" id="btn-vig-parar">⏹ Parar</button>` : `<button class="grande" id="btn-vig-iniciar">▶ Empezar a vigilar</button>`}</div>
+    </div>
+    ${e.activo && e.proxima ? `<p class="sub mt">Última vuelta: ${e.ultima ? fecha(e.ultima) : "en curso…"} · próxima: ${fecha(e.proxima)}</p>` : ""}
+    ${e.error ? `<p class="aviso mal">${esc(e.error)}</p>` : ""}
+    ${!VIG.hay_referencias ? `<p class="aviso">Antes de vigilar haz una <b>búsqueda completa</b> en Inicio: el vigilante usa sus precios de referencia. Repítela cada pocos días para que estén al día (o activa la búsqueda diaria automática).</p>` : ""}
+    ${avisoTg}
+    <details class="mt"><summary>Ver actividad</summary><pre>${esc(e.log.join("\n") || "Sin actividad todavía")}</pre></details>`;
+  $("#btn-vig-iniciar")?.addEventListener("click", async () => {
+    try { VIG = await api("/api/vigilante", { accion: "iniciar" }); toast("Vigilante en marcha 🟢"); pintarEstadoVig(); } catch (er) { error(er); } });
+  $("#btn-vig-parar")?.addEventListener("click", async () => {
+    try { VIG = await api("/api/vigilante", { accion: "parar" }); toast("Vigilante parado"); pintarEstadoVig(); } catch (er) { error(er); } });
+  const b = $("#badge-vig"); b.classList.toggle("oculto", !e.activo); b.textContent = "ON"; b.style.background = "var(--ok)";
+}
+function pintarTelegram() {
+  const tg = VIG.telegram;
+  $("#tg-estado").innerHTML = tg.conectado
+    ? `<p class="aviso ok">✅ Conectado con <b>@${esc(tg.bot)}</b>${tg.nombre ? " (chat de " + esc(tg.nombre) + ")" : ""}. Los avisos te llegarán ahí.</p>
+       <div class="acciones"><button class="sec" id="btn-tg-probar">Enviar mensaje de prueba</button><button class="enlace" id="btn-tg-desc">Desconectar</button></div>`
+    : tg.token ? `<p class="aviso">Bot <b>@${esc(tg.bot)}</b> guardado. Falta el último paso: abre el bot en Telegram, pulsa <b>Iniciar</b> y luego «Conectar con mi Telegram».</p>` : "";
+  $("#tg-pasos").classList.toggle("oculto", tg.conectado);
+  $("#btn-tg-probar")?.addEventListener("click", async () => { try { await api("/api/telegram", { accion: "probar" }); toast("Mensaje enviado. Míralo en Telegram 📲"); } catch (e) { error(e); } });
+  $("#btn-tg-desc")?.addEventListener("click", async () => {
+    if (!confirm("¿Desconectar Telegram? Tendrás que volver a pegar el token.")) return;
+    try { VIG.telegram = await api("/api/telegram", { accion: "desconectar" }); pintarTelegram(); pintarEstadoVig(); } catch (e) { error(e); } });
+}
+$("#btn-tg-token").addEventListener("click", async () => {
+  try { VIG.telegram = await api("/api/telegram", { accion: "token", token: $("#tg-token").value }); $("#tg-token").value = ""; toast(`Bot @${VIG.telegram.bot} guardado ✅`); pintarTelegram(); } catch (e) { error(e); }
+});
+$("#btn-tg-conectar").addEventListener("click", async () => {
+  try { VIG.telegram = await api("/api/telegram", { accion: "conectar" }); toast("¡Conectado! Te he enviado un mensaje a Telegram ✅"); pintarTelegram(); pintarEstadoVig(); } catch (e) { error(e); }
+});
+function pintarConfigVig() {
+  $("#vig-intervalo").value = String(VIG.intervalo);
+  if (!$("#vig-intervalo").value) $("#vig-intervalo").value = "180";
+  $("#vig-envios").checked = VIG.envios; $("#vig-auto").checked = VIG.auto; $("#vig-windows").checked = VIG.con_windows;
+  $("#lbl-vig-windows").classList.toggle("oculto", !VIG.windows);
+  const porCat = {};
+  VIG.modelos.forEach((m) => (porCat[m.categoria] ||= []).push(m));
+  $("#vig-modelos").innerHTML = !VIG.modelos.length ? `<p class="sub">Haz primero una búsqueda completa.</p>` :
+    Object.entries(porCat).map(([c, ms]) => `<div class="grupo-cat"><b>${CATS[c] || c}</b>${ms.map((m) =>
+      `<label title="${m.compra_max > 0 ? "Compra máx. " + m.compra_max + " €" : "No suele salir rentable"}"><input type="checkbox" data-m="${esc(m.nombre)}" ${m.vigilado ? "checked" : ""}> ${esc(m.nombre)} <span class="sub">${m.compra_max > 0 ? "≤ " + m.compra_max + " €" : "(no rentable)"}</span></label>`).join("")}</div>`).join("");
+  $$("#vig-modelos input").forEach((i) => i.addEventListener("change", () => { vigEditando = true; carga(); }));
+  carga();
+}
+function carga() {
+  const marcados = $$("#vig-modelos input:checked").length;
+  const n = marcados * ($("#vig-envios").checked ? 2 : 1), seg = +$("#vig-intervalo").value;
+  $("#vig-modelos-txt").textContent = `${marcados} modelos marcados. Por defecto se vigilan los que salen rentables comprando en tu zona.`;
+  $("#vig-carga").textContent = `≈ ${(n * 60 / seg).toFixed(1)} consultas por minuto a Wallapop`;
+}
+["#vig-intervalo", "#vig-envios", "#vig-auto"].forEach((s) => $(s).addEventListener("change", () => { vigEditando = true; carga(); }));
+$("#vig-rentables").addEventListener("click", () => { vigEditando = true; $$("#vig-modelos input").forEach((i) => { i.checked = VIG.modelos.find((m) => m.nombre === i.dataset.m).compra_max > 0; }); carga(); });
+$("#vig-ninguno").addEventListener("click", () => { vigEditando = true; $$("#vig-modelos input").forEach((i) => { i.checked = false; }); carga(); });
+$("#vig-windows").addEventListener("change", async (e) => {
+  try { VIG = await api("/api/vigilante", { accion: "inicio_windows", activar: e.target.checked });
+    toast(e.target.checked ? "El vigilante arrancará al encender el ordenador ✅" : "Ya no arrancará al encender el ordenador"); } catch (er) { error(er); e.target.checked = !e.target.checked; }
+});
+$("#btn-vig-guardar").addEventListener("click", async () => {
+  const marcados = $$("#vig-modelos input:checked").map((i) => i.dataset.m);
+  const rentables = VIG.modelos.filter((m) => m.compra_max > 0).map((m) => m.nombre);
+  const igual = marcados.length === rentables.length && marcados.every((m) => rentables.includes(m));
+  if (!marcados.length && !confirm("No has marcado ningún modelo: se vigilarán los rentables. ¿Seguir?")) return;
+  try {
+    await api("/api/ajustes", { ajustes: { VIGILANTE_INTERVALO: +$("#vig-intervalo").value, VIGILANTE_ENVIOS: $("#vig-envios").checked,
+      VIGILANTE_AUTO: $("#vig-auto").checked, VIGILANTE_MODELOS: igual ? [] : marcados } });
+    vigEditando = false; toast("Guardado. Se aplica en la próxima vuelta ✅"); cargarVigilante();
+  } catch (e) { error(e); }
+});
+function pintarAvisos() {
+  const l = VIG.avisos;
+  $("#vig-avisos-txt").textContent = l.length ? `${l.length} avisos. Los ⏳ tienen las fotos sin revisar: míralas antes de escribir.` : "";
+  $("#vig-avisos").innerHTML = l.length ? l.map((o) => carta(o).replace('<div class="cuerpo">',
+    `<div class="cuerpo"><span class="meta">🔔 Aviso ${esc(fecha(o.aviso))}${o.telegram ? " · enviado a Telegram" : ""}</span>`)).join("")
+    : `<div class="vacio">Todavía no hay avisos. Cuando el vigilante encuentre una ganga recién publicada aparecerá aquí y en Telegram.</div>`;
+  $$("#vig-avisos .carta").forEach((el) => el.addEventListener("click", () => detalle(l.find((o) => o.id === el.dataset.id))));
+}
+$("#btn-vig-borrar").addEventListener("click", async () => {
+  if (!confirm("¿Borrar la lista de avisos? (No afecta a lo que ya te llegó por Telegram.)")) return;
+  try { VIG = await api("/api/vigilante", { accion: "borrar_avisos" }); pintarAvisos(); } catch (e) { error(e); }
 });
 
 // ===================================================================
