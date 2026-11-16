@@ -106,7 +106,64 @@ async function cargarDatos() {
   b.title = `${nuevas} nuevas, ${pend} por revisar`;
 }
 
-async function cargarInicio() { await refrescarEstado(); await cargarDatos(); pintarInicio(); }
+async function cargarInicio() { await refrescarEstado(); await cargarDatos(); pintarInicio(); cargarBusqueda(); }
+
+let QB = null, qbEditando = false;
+async function cargarBusqueda() {
+  try { QB = await api("/api/busqueda"); } catch (e) { return error(e); }
+  if (!qbEditando) {
+    $$("input[name=qb-modo]").forEach((r) => { r.checked = r.value === QB.modo; });
+    $("#qb-texto").value = QB.texto || "";
+    const sel = $("#qb-catalogo");
+    if (sel.options.length <= 1) sel.insertAdjacentHTML("beforeend", QB.catalogo.map((g) => `<option>${esc(g)}</option>`).join(""));
+  }
+  pintarBusqueda();
+}
+function modoElegido() { return ($("input[name=qb-modo]:checked") || {}).value || QB?.modo || "top5"; }
+function pintarBusqueda() {
+  const modo = modoElegido();
+  $("#qb-top5").classList.toggle("oculto", modo !== "top5");
+  $("#qb-personal").classList.toggle("oculto", modo !== "personal");
+  $$(".opcion").forEach((l) => l.classList.toggle("elegida", l.querySelector("input").checked));
+  const t = QB.top5;
+  $("#qb-top5").innerHTML = !t.length ? `<p class="aviso">Todavía no hay top 5 calculado.</p>` : `<ol class="top5">${t.map((a) => `
+      <li><b>${esc(a.articulo)}</b>${a.motivos?.length ? ` <span class="sub">— ${esc(a.motivos.join(", "))}</span>` : ""}
+        <div class="chips">${a.modelos.map((m) => `<span class="chip" title="${m.rotacion != null ? Math.round(m.rotacion * 100) + " % vendido o reservado en ~4 días" : ""}">${esc(m.nombre)}${m.compra_max > 0 ? ` <small>≤ ${m.compra_max} €</small>` : ""}</span>`).join("")}</div></li>`).join("")}</ol>
+    <p class="sub">${QB.top5_origen === "calculado" ? `Calculado en este equipo el ${fecha(QB.top5_fecha)}.` : "Top 5 de la investigación inicial con datos de Wallapop."}
+      Se basa en lo que se vende más rápido, el interés de los compradores, los anuncios nuevos al día, el margen y las gangas encontradas.
+      ${MOVIL ? "" : `<button class="enlace" id="btn-top5">🔄 Recalcular con datos de hoy (≈ 45 min)</button>`}</p>`;
+  $("#btn-top5")?.addEventListener("click", async () => {
+    if (!confirm("Recalcular el top 5 busca TODO el catálogo (42 modelos) y mide qué se vende antes. Tarda unos 45 minutos. ¿Empezar?")) return;
+    try { await api("/api/top5", {}); refrescarEstado(); toast("Recalculando el top 5…"); } catch (e) { error(e); }
+  });
+  pintarTerminos();
+  $("#qb-estado").textContent = modo === "top5" ? `Se buscarán ${QB.top5.reduce((s, a) => s + a.modelos.length, 0)} modelos.` : "";
+}
+function pintarTerminos() {
+  const lista = $("#qb-texto").value.split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean);
+  const norm = (t) => t.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").split(/\s+/).filter(Boolean).join(" ");
+  const buscar = (t) => { const n = norm(t); return QB.alias[n] || QB.alias[n.startsWith("consola ") ? n.slice(8) : n]; };
+  $("#qb-terminos").innerHTML = lista.length ? `<div class="chips">${lista.map((x) => {
+    const real = QB.terminos.find((t) => t.texto.toLowerCase() === x.toLowerCase());
+    const modelo = real ? real.modelo : buscar(x);
+    return `<span class="chip" title="${modelo ? "Modelo del catálogo: usa sus filtros y costes de reparación" : "Búsqueda genérica: todos los anuncios que contengan estas palabras"}">${modelo ? "✓ " + esc(modelo) : "🔎 " + esc(x)}</span>`;
+  }).join("")}</div><p class="sub">${lista.length} búsquedas. ✓ = modelo del catálogo · 🔎 = búsqueda genérica.</p>` : "";
+}
+$$("input[name=qb-modo]").forEach((r) => r.addEventListener("change", () => { qbEditando = true; pintarBusqueda(); }));
+$("#qb-texto").addEventListener("input", () => { qbEditando = true; pintarTerminos(); });
+$("#qb-catalogo").addEventListener("change", (e) => {
+  if (!e.target.value) return;
+  const t = $("#qb-texto");
+  t.value = (t.value.trim() ? t.value.trim().replace(/[,;]$/, "") + ", " : "") + e.target.value;
+  e.target.value = ""; qbEditando = true; pintarTerminos();
+});
+$("#btn-qb-guardar").addEventListener("click", async () => {
+  try {
+    QB = await api("/api/busqueda", { modo: modoElegido(), texto: $("#qb-texto").value });
+    qbEditando = false; pintarBusqueda(); refrescarEstado();
+    toast(QB.modo === "top5" ? "Buscarás los 5 artículos más rentables ✅" : `Buscarás: ${QB.terminos.map((t) => t.modelo || t.texto).join(", ")} ✅`);
+  } catch (e) { error(e); }
+});
 
 function pintarInicio() {
   const r = ESTADO?.resumen;
@@ -459,16 +516,12 @@ function pintarAjustes() {
       <td><input type="number" data-m="${esc(m)}" data-t="taller" value="${p.taller ?? ""}"></td>
       <td><input type="number" data-m="${esc(m)}" data-t="oficial" value="${p.oficial ?? ""}"></td>
       <td><input type="number" data-m="${esc(m)}" data-t="trasera" value="${a.REPARACION_TRASERA[m] ?? ""}"></td></tr>`; }).join("") + "</tbody>";
-  const porCat = {};
-  AJ.grupos.forEach((g) => (porCat[g.categoria] ||= []).push(g));
-  $("#lista-grupos").innerHTML = Object.entries(porCat).map(([c, gs]) => `<div class="grupo-cat"><b>${CATS[c] || c}</b>${gs.map((g) =>
-    `<label><input type="checkbox" data-g="${esc(g.nombre)}" ${g.activo ? "checked" : ""}> ${esc(g.nombre)}</label>`).join("")}</div>`).join("");
-  $$("#lista-grupos input").forEach((i) => i.addEventListener("change", actualizarTiempo));
 }
-function actualizarTiempo() {
+async function actualizarTiempo() {
   const pag = +$("#aj-PAGINAS").value || (MOVIL ? 2 : 5);
-  const n = $$("#lista-grupos input:checked").length || AJ?.grupos.filter((g) => g.activo).length || 0;
-  $("#aj-tiempo").textContent = `Con ${n} modelos activos, cada búsqueda tardará unos ${Math.max(1, Math.round((n * (3 * pag + Math.min(2, pag)) * (MOVIL ? 0.4 : 2.6)) / 60))} minutos.`;
+  if (!QB) { try { QB = await api("/api/busqueda"); } catch { return; } }
+  const n = QB.activos.length;
+  $("#aj-tiempo").textContent = `Con lo que buscas ahora (${n} búsquedas), cada búsqueda completa tardará unos ${Math.max(1, Math.round((n * (3 * pag + Math.min(2, pag)) * (MOVIL ? 0.4 : 2.6)) / 60))} minutos.`;
 }
 $("#aj-PAGINAS").addEventListener("input", actualizarTiempo);
 $("#btn-guardar-aj").addEventListener("click", async () => {
@@ -480,7 +533,6 @@ $("#btn-guardar-aj").addEventListener("click", async () => {
     if (i.dataset.t === "trasera") { if (v) tras[m] = v; } else { (pant[m] ||= { taller: null, oficial: null })[i.dataset.t] = v; }
   });
   nuevos.REPARACION_PANTALLA = pant; nuevos.REPARACION_TRASERA = tras;
-  nuevos.GRUPOS_DESACTIVADOS = $$("#lista-grupos input").filter((i) => !i.checked).map((i) => i.dataset.g);
   try { AJ = await api("/api/ajustes", { ajustes: nuevos }); pintarAjustes(); refrescarEstado(); toast("Ajustes guardados ✅"); } catch (e) { error(e); }
 });
 $("#btn-restablecer").addEventListener("click", async () => {
@@ -560,35 +612,26 @@ function pintarConfigVig() {
   if (!$("#vig-intervalo").value) $("#vig-intervalo").value = "180";
   $("#vig-envios").checked = VIG.envios; $("#vig-auto").checked = VIG.auto; $("#vig-windows").checked = VIG.con_windows;
   $("#lbl-vig-windows").classList.toggle("oculto", !VIG.windows);
-  const porCat = {};
-  VIG.modelos.forEach((m) => (porCat[m.categoria] ||= []).push(m));
-  $("#vig-modelos").innerHTML = !VIG.modelos.length ? `<p class="sub">Haz primero una búsqueda completa.</p>` :
-    Object.entries(porCat).map(([c, ms]) => `<div class="grupo-cat"><b>${CATS[c] || c}</b>${ms.map((m) =>
-      `<label title="${m.compra_max > 0 ? "Compra máx. " + m.compra_max + " €" : "No suele salir rentable"}"><input type="checkbox" data-m="${esc(m.nombre)}" ${m.vigilado ? "checked" : ""}> ${esc(m.nombre)} <span class="sub">${m.compra_max > 0 ? "≤ " + m.compra_max + " €" : "(no rentable)"}</span></label>`).join("")}</div>`).join("");
-  $$("#vig-modelos input").forEach((i) => i.addEventListener("change", () => { vigEditando = true; carga(); }));
+  const modo = VIG.modo === "personal" ? "lo que has escrito" : "los 5 artículos más rentables";
+  $("#vig-modelos").innerHTML = !VIG.modelos.length ? `<p class="aviso">No hay nada que vigilar. Elige qué buscar en Inicio.</p>` :
+    `<p class="sub">Ahora vigila <b>${modo}</b>:</p><div class="chips">${VIG.modelos.map((m) => `<span class="chip ${m.vigilado ? "" : "apagado"}"
+      title="${m.vigilado ? (m.compra_max > 0 ? "Compra máx. " + m.compra_max + " €" : "No suele salir rentable") : "Sin precio de referencia: haz una búsqueda completa"}">${esc(m.nombre)}${m.vigilado ? (m.compra_max > 0 ? ` <small>≤ ${m.compra_max} €</small>` : " <small>(no rentable)</small>") : " <small>⚠️ sin precio</small>"}</span>`).join("")}</div>
+    ${VIG.modelos.some((m) => !m.vigilado) ? `<p class="aviso">Los marcados con ⚠️ no se vigilan hasta que hagas una búsqueda completa: el vigilante necesita su precio de referencia.</p>` : ""}`;
   carga();
 }
 function carga() {
-  const marcados = $$("#vig-modelos input:checked").length;
-  const n = marcados * ($("#vig-envios").checked ? 2 : 1), seg = +$("#vig-intervalo").value;
-  $("#vig-modelos-txt").textContent = `${marcados} modelos marcados. Por defecto se vigilan los que salen rentables comprando en tu zona.`;
+  const n = VIG.modelos.filter((m) => m.vigilado).length * ($("#vig-envios").checked ? 2 : 1), seg = +$("#vig-intervalo").value;
   $("#vig-carga").textContent = `≈ ${(n * 60 / seg).toFixed(1)} consultas por minuto a Wallapop`;
 }
 ["#vig-intervalo", "#vig-envios", "#vig-auto"].forEach((s) => $(s).addEventListener("change", () => { vigEditando = true; carga(); }));
-$("#vig-rentables").addEventListener("click", () => { vigEditando = true; $$("#vig-modelos input").forEach((i) => { i.checked = VIG.modelos.find((m) => m.nombre === i.dataset.m).compra_max > 0; }); carga(); });
-$("#vig-ninguno").addEventListener("click", () => { vigEditando = true; $$("#vig-modelos input").forEach((i) => { i.checked = false; }); carga(); });
 $("#vig-windows").addEventListener("change", async (e) => {
   try { VIG = await api("/api/vigilante", { accion: "inicio_windows", activar: e.target.checked });
     toast(e.target.checked ? "El vigilante arrancará al encender el ordenador ✅" : "Ya no arrancará al encender el ordenador"); } catch (er) { error(er); e.target.checked = !e.target.checked; }
 });
 $("#btn-vig-guardar").addEventListener("click", async () => {
-  const marcados = $$("#vig-modelos input:checked").map((i) => i.dataset.m);
-  const rentables = VIG.modelos.filter((m) => m.compra_max > 0).map((m) => m.nombre);
-  const igual = marcados.length === rentables.length && marcados.every((m) => rentables.includes(m));
-  if (!marcados.length && !confirm("No has marcado ningún modelo: se vigilarán los rentables. ¿Seguir?")) return;
   try {
     await api("/api/ajustes", { ajustes: { VIGILANTE_INTERVALO: +$("#vig-intervalo").value, VIGILANTE_ENVIOS: $("#vig-envios").checked,
-      VIGILANTE_AUTO: $("#vig-auto").checked, VIGILANTE_MODELOS: igual ? [] : marcados } });
+      VIGILANTE_AUTO: $("#vig-auto").checked } });
     vigEditando = false; toast("Guardado. Se aplica en la próxima vuelta ✅"); cargarVigilante();
   } catch (e) { error(e); }
 });

@@ -87,6 +87,64 @@
     return null;
   }
 
+  // ---------------------------------------------------------------- qué se busca (config.py)
+  const CATEGORIAS = [
+    ["movil", /iphone|galaxy|samsung|xiaomi\s*(redmi|\d)|redmi|pixel|oppo|oneplus|huawei|motorola|m[oó]vil|smartphone/],
+    ["consola", /ps[45]\b|playstation|xbox|nintendo|switch|steam\s*deck|consola/],
+    ["patinete", /patinete|scooter|ninebot|segway/],
+    ["zapatilla", /zapatilla|nike|jordan|adidas|new\s*balance|yeezy|dunk|samba|converse|vans\b|asics/],
+    ["videojuego", /\bjuego\b|videojuego/],
+  ];
+  const VACIAS = new Set(["de", "del", "la", "las", "el", "los", "y", "con", "para", "en", "a", "un", "una", "o"]);
+  const VOCALES = { a: "[aáàä]", e: "[eéèë]", i: "[iíìï]", o: "[oóòö]", u: "[uúùü]", n: "[nñ]" };
+  const normal = (t) => String(t).toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").split(/\s+/).filter(Boolean).join(" ");
+  const quitaConsola = (t) => (t.startsWith("consola ") ? t.slice(8) : t);
+  function terminos() {
+    const vistos = new Set(), out = [];
+    for (let t of String(C.BUSQUEDA_TEXTO || "").split(/[,;\n]+/)) {
+      t = t.split(/\s+/).filter(Boolean).join(" ");
+      if (t && !vistos.has(normal(t))) { vistos.add(normal(t)); out.push(t); }
+    }
+    return out.slice(0, 20);
+  }
+  function modeloConocido(termino) {
+    const n = normal(termino), cand = new Set([n, quitaConsola(n)]);
+    for (const [g, d] of Object.entries(C.GRUPOS))
+      if ([normal(g), normal(d.q), quitaConsola(normal(d.q))].some((x) => cand.has(x))) return g;
+    return null;
+  }
+  function regexPalabras(termino) {
+    let palabras = normal(termino).split(" ").filter((p) => !VACIAS.has(p));
+    if (!palabras.length) palabras = normal(termino).split(" ");
+    return palabras.map((p) => {
+      const cuerpo = [...p].map((c) => VOCALES[c] || c.replace(/[.*+?^${}()|[\]\\\-]/g, "\\$&")).join("");
+      return "(?=.*(?:^|[^a-z0-9áéíóúüñàèìòùäëïö])" + cuerpo + (/\d$/.test(p) ? "(?!\\d)" : "") + ")";
+    }).join("");
+  }
+  function grupoPersonal(termino) {
+    const g = modeloConocido(termino);
+    if (g) return [g, C.GRUPOS[g]];
+    const cat = (CATEGORIAS.find(([, re]) => re.test(normal(termino))) || ["otro"])[0];
+    const primera = regexPalabras(normal(termino).split(" ")[0]).slice("(?=.*(?:^|[^a-z0-9áéíóúüñàèìòùäëïö])".length, -1);
+    return [termino, { cat, q: normal(termino), inc: regexPalabras(termino),
+      exc: "\\bbusco\\b|\\bcompro\\b|cambio por|compatible|\\bpara\\s+(?:el\\s+|la\\s+|tu\\s+)?" + primera,
+      personal: true, minimo: C.PRECIO_MIN_PERSONAL }];
+  }
+  let cachePers = { texto: null, grupos: null };
+  function gruposPersonales() {
+    if (cachePers.texto !== C.BUSQUEDA_TEXTO) cachePers = { texto: C.BUSQUEDA_TEXTO, grupos: Object.fromEntries(terminos().map(grupoPersonal)) };
+    return cachePers.grupos;
+  }
+  const top5 = () => ({ top: C.TOP5_DEFECTO || [], fecha: null, origen: "por defecto" });
+  function gruposActivos() {
+    if (C.BUSQUEDA_MODO === "personal") return gruposPersonales();
+    const out = {};
+    for (const t of top5().top) for (const g of t.modelos) if (C.GRUPOS[g]) out[g] = C.GRUPOS[g];
+    return out;
+  }
+  const gruposClasificacion = () => (C.BUSQUEDA_MODO === "personal" ? gruposPersonales() : C.GRUPOS);
+  const grupo = (n) => C.GRUPOS[n] || gruposPersonales()[n] || grupoPersonal(n)[1];
+
   // ---------------------------------------------------------------- tarea en curso
   const T = { activa: false, cancelar: false, fase: "", texto: "", fraccion: 0, inicio: null, fin: null, error: null, log: [] };
   function progreso(fase, ini, peso) {
@@ -114,7 +172,8 @@
     for (let i = 0; i < paginas; i++) {
       if (T.cancelar) throw new Cancelado();
       const d = await pedir(url);
-      if (!d || d.__error) break;
+      T.consultas = (T.consultas || 0) + 1;
+      if (!d || d.__error) { T.fallos = (T.fallos || 0) + 1; break; }
       const items = d?.data?.section?.payload?.items || [];
       out = out.concat(items);
       const sig = d?.meta?.next_page;
@@ -136,8 +195,9 @@
     };
   }
   async function recoger(prog) {
-    const grupos = Object.entries(C.GRUPOS).filter(([g]) => !C.GRUPOS_DESACTIVADOS.includes(g));
-    if (!grupos.length) throw new Error("No hay ningún modelo activo. Activa alguno en Ajustes.");
+    const grupos = Object.entries(gruposActivos());
+    if (!grupos.length) throw new Error("No hay nada que buscar. En Inicio elige «Top 5» o escribe lo que quieres buscar.");
+    T.consultas = 0; T.fallos = 0;
     const pag = +C.PAGINAS || 2, todos = new Map();
     let hechos = 0, cola = [...grupos];
     async function trabajador() {
@@ -156,21 +216,24 @@
       }
     }
     await Promise.all(Array.from({ length: SIMULTANEAS }, trabajador));
-    const minimo = 300 * grupos.length / Object.keys(C.GRUPOS).length;
-    if (todos.size < minimo) throw new Error(`Solo se han descargado ${todos.size} anuncios. Comprueba la conexión a Internet. Se conservan los resultados anteriores.`);
+    if (T.consultas && T.fallos > T.consultas / 2)
+      throw new Error(`Han fallado ${T.fallos} de ${T.consultas} consultas. Comprueba la conexión a Internet. Se conservan los resultados anteriores.`);
+    if (!todos.size) throw new Error("No se ha encontrado ningún anuncio para lo que buscas. Revisa cómo lo has escrito (prueba con menos palabras o el nombre del modelo).");
     return [...todos.values()];
   }
 
   // ---------------------------------------------------------------- análisis (analizar.py)
   let RX = null;
   function regex() {
-    if (RX) return RX;
+    const clave = C.BUSQUEDA_MODO + "|" + C.BUSQUEDA_TEXTO;
+    if (RX && RX.clave === clave) return RX;
     RX = {
+      clave,
       replica: /r[eé]plica|\brep\b|1:1|\baaa\b|no (es )?original|imitaci|fake|tipo nike|tipo jordan/i,
       acc: rx(C.ACCESORIOS),
       bat: /(?:bater[ií]a|salud|condici[oó]n|capacidad|\bbh\b|\bbat\b)[^\d\n]{0,30}(\d{2,3})\s*%|(\d{2,3})\s*%\s*(?:de\s*)?(?:salud|bater|capacidad|bh\b)/i,
       estados: Object.fromEntries(Object.entries(C.ESTADO_REGEX).map(([k, v]) => [k, rx(v)])),
-      grupos: Object.fromEntries(Object.entries(C.GRUPOS).map(([g, d]) => [g, { inc: rx(d.inc), exc: rx(d.exc) }])),
+      grupos: Object.fromEntries(Object.entries(gruposClasificacion()).map(([g, d]) => [g, { inc: rx(d.inc), exc: rx(d.exc), personal: !!d.personal }])),
     };
     return RX;
   }
@@ -187,16 +250,26 @@
   }
   function clasificar(a) {
     const t = a.titulo.toLowerCase();
-    const hits = Object.entries(regex().grupos).filter(([, r]) => r.inc.test(t) && !r.exc.test(t)).map(([g]) => g);
-    return hits.length === 1 ? hits[0] : null;
+    const G = regex().grupos;
+    const hits = Object.entries(G).filter(([, r]) => r.inc.test(t) && !r.exc.test(t)).map(([g]) => g);
+    if (hits.length <= 1) return hits[0] || null;
+    // varias búsquedas propias encajan: gana la más concreta (como analizar.py)
+    const delCatalogo = hits.filter((g) => !G[g].personal);
+    if (delCatalogo.length === 1) return delCatalogo[0];
+    if (!delCatalogo.length) {
+      const palabras = (g) => normal(g).split(" ").length;
+      hits.sort((x, y) => palabras(y) - palabras(x));
+      if (palabras(hits[0]) > palabras(hits[1])) return hits[0];
+    }
+    return null;
   }
   function valido(a) {
     if (a.precio == null || a.reservado) return false;
     const g = clasificar(a);
     if (!g) return false;
     a.grupo = g;
-    const cat = C.GRUPOS[g].cat;
-    if (a.precio < C.PRECIO_MIN[cat]) return false;
+    const def = grupo(g), cat = def.cat;
+    if (a.precio < (def.minimo ?? C.PRECIO_MIN[cat])) return false;
     if (cat !== "videojuego" && regex().acc.test(a.titulo)) return false;
     if (regex().replica.test(`${a.titulo} ${a.descripcion}`)) return false;
     return true;
@@ -213,7 +286,7 @@
     let factorBat = 1;
     if (r.categoria === "movil" && bat != null) {
       if (bat < C.BATERIA_MIN) {
-        const cb = a.grupo.startsWith("iPhone") ? C.BATERIA_IPHONE : C.BATERIA_SAMSUNG;
+        const cb = a.grupo.toLowerCase().startsWith("iphone") ? C.BATERIA_IPHONE : C.BATERIA_SAMSUNG;
         reparacion += cb; notas.push(`batería ${bat} % → cambio ${cb} €`);
       } else if (bat < 85) { factorBat = C.BATERIA_FACTOR_80_85; notas.push(`batería ${bat} %`); }
     }
@@ -284,7 +357,7 @@
 
     // referencias
     const ref = {};
-    for (const [g, d] of Object.entries(C.GRUPOS)) {
+    for (const [g, d] of Object.entries(gruposClasificacion())) {
       const usados = sinAtipicos(validos.filter((a) => a.grupo === g && a.estado === "usado").map((a) => a.precio));
       const nuevos = sinAtipicos(validos.filter((a) => a.grupo === g && a.estado === "nuevo").map((a) => a.precio));
       if (usados.length < 10) continue;
@@ -324,7 +397,7 @@
       else if (d.error || d.reservado) motivo = "vendido, reservado o borrado";
       else if (d.pais && d.pais !== "ES") motivo = "fuera de España";
       else if (modeloFicha(d) && !(G.inc.test(modeloFicha(d)) && !G.exc.test(modeloFicha(d)))) motivo = "modelo real";
-      else if (/\bgame\b|rpg|juego|\bvr/i.test(d.caracteristicas || "") && C.GRUPOS[a.grupo].cat === "consola") motivo = "no es una consola";
+      else if (/\bgame\b|rpg|juego|\bvr/i.test(d.caracteristicas || "") && grupo(a.grupo).cat === "consola") motivo = "no es una consola";
       if (!motivo) {
         c = calcular(a, ref[a.grupo], d.condicion);
         if (!c) motivo = `estado ${d.condicion}`;
@@ -362,7 +435,7 @@
     ops = ops.filter((o) => !excl.includes(o));
     descartes["revisión manual de fotos"] = excl.length;
     ops.sort((a, b) => (b.local - a.local) || (b.nuevo - a.nuevo) || (b.beneficio - a.beneficio));
-    const rotas = validos.filter((x) => x.estado === "pantalla_rota" && C.GRUPOS[x.grupo].cat === "movil").length;
+    const rotas = validos.filter((x) => x.estado === "pantalla_rota" && grupo(x.grupo).cat === "movil").length;
 
     const resumen = {
       fecha: ahora, ejecucion_anterior: ultima, anuncios: anuncios.length, validos: validos.length, republicados,
@@ -408,7 +481,7 @@
 
   // ---------------------------------------------------------------- API para la interfaz
   const minutos = () => {
-    const n = Object.keys(C.GRUPOS).filter((g) => !C.GRUPOS_DESACTIVADOS.includes(g)).length, p = +C.PAGINAS || 2;
+    const n = Object.keys(gruposActivos()).length, p = +C.PAGINAS || 2;
     return Math.max(1, redondear((n * (3 * p + Math.min(2, p)) * 1.2) / SIMULTANEAS / 60));
   };
   const OPS_CAMPOS = ["id", "articulo", "categoria", "estado", "fecha_compra", "precio_compra", "gastos", "fecha_venta", "precio_venta", "comision", "url", "notas"];
@@ -443,7 +516,6 @@
     "/api/ajustes": () => ({
       ajustes: Object.fromEntries(DEFECTO.EDITABLES.map((k) => [k, C[k]])),
       defecto: Object.fromEntries(DEFECTO.EDITABLES.map((k) => [k, DEFECTO[k]])),
-      grupos: Object.entries(C.GRUPOS).map(([nombre, d]) => ({ nombre, categoria: d.cat, busqueda: d.q, activo: !C.GRUPOS_DESACTIVADOS.includes(nombre) })),
     }),
     "POST /api/ajustes": (b) => {
       const nuevos = {};
@@ -458,6 +530,25 @@
       guardar("ajustes", { ...leer("ajustes", {}), ...nuevos });
       aplicarAjustes(); RX = null;
       return rutas["/api/ajustes"]();
+    },
+    "/api/busqueda": () => {
+      const ref = leer("referencias", {}), t = top5();
+      return {
+        modo: C.BUSQUEDA_MODO, texto: C.BUSQUEDA_TEXTO,
+        terminos: terminos().map((x) => ({ texto: x, modelo: modeloConocido(x), categoria: grupoPersonal(x)[1].cat })),
+        top5: t.top.map((a) => ({ articulo: a.articulo, motivos: a.motivos || [], puntuacion: a.puntuacion,
+          modelos: a.modelos.map((g) => ({ nombre: g, compra_max: ref[g]?.compra_max_local ?? null, rotacion: (a.rotaciones || {})[g] ?? null })) })),
+        top5_fecha: t.fecha, top5_origen: t.origen, activos: Object.keys(gruposActivos()), catalogo: Object.keys(C.GRUPOS), minutos: minutos(),
+        alias: Object.fromEntries(Object.entries(C.GRUPOS).flatMap(([g, d]) => [normal(g), normal(d.q), quitaConsola(normal(d.q))].map((k) => [k, g]))),
+      };
+    },
+    "POST /api/busqueda": (b) => {
+      if (!["top5", "personal"].includes(b.modo)) throw new Error("Elige «Top 5» o «Lo que yo escriba»");
+      if (b.modo === "personal" && !String(b.texto || "").split(/[,;\n]+/).some((t) => t.trim()))
+        throw new Error("Escribe al menos un artículo (por ejemplo: iPhone 13 Pro, PS5 Slim)");
+      guardar("ajustes", { ...leer("ajustes", {}), BUSQUEDA_MODO: b.modo, BUSQUEDA_TEXTO: String(b.texto || "").slice(0, 2000) });
+      aplicarAjustes(); RX = null;
+      return rutas["/api/busqueda"]();
     },
     "POST /api/restablecer": () => { guardar("ajustes", {}); aplicarAjustes(); RX = null; return rutas["/api/ajustes"](); },
     "POST /api/buscar": async (b) => { await lanzar(!!b.solo_analizar); return { ...T }; },
@@ -560,6 +651,6 @@
     },
     exportarOperaciones: () => compartirArchivo("mis_operaciones.csv", csvOperaciones(), "text/csv"),
     exportarCopia, importarCopia,
-    _interno: { redondear, cuartiles, mediana, sinAtipicos, calcular, valido, estadoTexto, bateria, clasificar, config: () => C },
+    _interno: { gruposClasificacion, redondear, cuartiles, mediana, sinAtipicos, calcular, valido, estadoTexto, bateria, clasificar, config: () => C },
   };
 })();

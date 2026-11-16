@@ -42,6 +42,24 @@
     </div>
   </div>
 
+  <div class="tarjeta" id="que-buscar">
+    <h2>¿Qué quieres buscar?</h2>
+    <div class="opciones-busqueda">
+      <label class="opcion"><input type="radio" name="qb-modo" value="top5">
+        <span><b>⭐ Los 5 artículos más rentables</b><span class="sub">Elegidos con datos reales de Wallapop: lo que antes se vende, más interés despierta y más margen deja.</span></span></label>
+      <label class="opcion"><input type="radio" name="qb-modo" value="personal">
+        <span><b>✍️ Lo que yo escriba</b><span class="sub">Uno o varios artículos: un modelo de los de arriba o cualquier otra cosa.</span></span></label>
+    </div>
+    <div id="qb-top5" class="mt"></div>
+    <div id="qb-personal" class="mt oculto">
+      <textarea id="qb-texto" rows="3" placeholder="Escribe uno o varios, separados por comas o en líneas distintas.&#10;Ej.: iPhone 13 Pro, PS5 Slim, bicicleta de montaña"></textarea>
+      <div class="en-linea mt"><select id="qb-catalogo"><option value="">➕ Añadir un modelo del catálogo…</option></select></div>
+      <div id="qb-terminos" class="mt"></div>
+      <p class="sub mt">Escribe el <b>modelo concreto</b> («iPhone 12 Pro», no solo «iPhone»): si es genérico se mezclan modelos de precios muy distintos y el precio de referencia no sirve. Los modelos del catálogo usan además sus filtros y costes de reparación.</p>
+    </div>
+    <div class="acciones"><button id="btn-qb-guardar">💾 Guardar</button><span class="sub" id="qb-estado"></span></div>
+  </div>
+
   <div class="tarjeta busqueda">
     <div class="busqueda-izq">
       <h2>Buscar ofertas en Wallapop</h2>
@@ -115,7 +133,7 @@
 <section id="tab-vigilante" class="tab">
   <div class="fila-cabecera">
     <div><h1>Vigilante</h1>
-      <p class="sub">Mira cada pocos minutos los anuncios <b>recién publicados</b> de los modelos que elijas y te avisa al momento por Telegram si alguno es una ganga. Analiza solo lo nuevo, con los mismos criterios que la búsqueda completa.</p></div>
+      <p class="sub">Mira cada pocos minutos los anuncios <b>recién publicados</b> de lo que buscas (top 5 o lo que escribas en Inicio) y te avisa al momento por Telegram si alguno es una ganga. Analiza solo lo nuevo, con los mismos criterios que la búsqueda completa.</p></div>
   </div>
   <div class="dos-col">
     <div>
@@ -148,9 +166,8 @@
         <label class="chk"><input type="checkbox" id="vig-auto"> Arrancar el vigilante al abrir CompraVenta</label><br>
         <label class="chk" id="lbl-vig-windows"><input type="checkbox" id="vig-windows"> Arrancar el vigilante al encender el ordenador (en segundo plano, sin ventana)</label>
         <p class="sub">Menos minutos = te enteras antes, pero más consultas a Wallapop y más riesgo de que limite tu conexión. Recomendado: 3 minutos y solo los modelos que te interesan.</p>
-        <h3 class="mt">📱 Modelos a vigilar</h3>
-        <p class="sub" id="vig-modelos-txt"></p>
-        <div class="acciones"><button class="sec peq" id="vig-rentables">Solo los rentables</button><button class="sec peq" id="vig-ninguno">Quitar todos</button></div>
+        <h3 class="mt">📱 Qué vigila</h3>
+        <p class="sub">Vigila lo mismo que buscas. Para cambiarlo, ve a <button class="enlace" data-ir="inicio">Inicio → ¿Qué quieres buscar?</button></p>
         <div id="vig-modelos"></div>
         <div class="acciones"><button id="btn-vig-guardar">💾 Guardar</button></div>
       </div>
@@ -268,11 +285,6 @@
         <h3>🛠️ Costes de reparación</h3>
         <p class="sub">Se usa el más barato disponible. Deja vacío si no lo sabes.</p>
         <table class="tabla compacta" id="tabla-rep"></table>
-      </div>
-      <div class="tarjeta">
-        <h3>📱 Modelos que se buscan</h3>
-        <p class="sub">Desactiva los que no te interesen: la búsqueda irá más rápida.</p>
-        <div id="lista-grupos"></div>
       </div>
     </div>
   </div>
