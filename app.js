@@ -90,6 +90,7 @@ async function refrescarEstado() {
   }
   const av = $("#aviso-tarea");
   if (!t.activa && t.error) { av.className = "aviso mal"; av.textContent = t.error; }
+  else if (!t.activa && t.fase === "Terminado" && t.fin && t.aviso) { av.className = "aviso"; av.textContent = `⚠️ Búsqueda terminada (${fecha(t.fin)}), pero con fallos: ${t.aviso}`; }
   else if (!t.activa && t.fase === "Terminado" && t.fin) { av.className = "aviso ok"; av.textContent = `✅ Búsqueda terminada (${fecha(t.fin)}).`; }
   else av.className = "aviso oculto";
   // al terminar una tarea, recargar datos
