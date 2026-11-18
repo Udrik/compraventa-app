@@ -126,8 +126,10 @@
     if (g) return [g, C.GRUPOS[g]];
     const cat = (CATEGORIAS.find(([, re]) => re.test(normal(termino))) || ["otro"])[0];
     const primera = regexPalabras(normal(termino).split(" ")[0]).slice("(?=.*(?:^|[^a-z0-9áéíóúüñàèìòùäëïö])".length, -1);
+    const palabras = normal(termino).split(" "), sobran = (C.VARIANTES || []).filter((v) => !palabras.includes(v));
     return [termino, { cat, q: normal(termino), inc: regexPalabras(termino),
-      exc: "\\bbusco\\b|\\bcompro\\b|cambio por|compatible|\\bpara\\s+(?:el\\s+|la\\s+|tu\\s+)?" + primera,
+      exc: "\\bbusco\\b|\\bcompro\\b|cambio por|compatible|\\bpara\\s+(?:el\\s+|la\\s+|tu\\s+)?" + primera
+        + (sobran.length ? "|\\b(?:" + sobran.join("|") + ")\\b" : ""),
       personal: true, minimo: C.PRECIO_MIN_PERSONAL }];
   }
   let cachePers = { texto: null, grupos: null };
@@ -135,14 +137,14 @@
     if (cachePers.texto !== C.BUSQUEDA_TEXTO) cachePers = { texto: C.BUSQUEDA_TEXTO, grupos: Object.fromEntries(terminos().map(grupoPersonal)) };
     return cachePers.grupos;
   }
-  const top5 = () => ({ top: C.TOP5_DEFECTO || [], fecha: null, origen: "por defecto" });
+  const top5 = () => ({ top: C.TOP5_DEFECTO || [], fecha: null, origen: "investigación", fuente: C.FUENTE_TOP5 });
   function gruposActivos() {
     if (C.BUSQUEDA_MODO === "personal") return gruposPersonales();
     const out = {};
-    for (const t of top5().top) for (const g of t.modelos) if (C.GRUPOS[g]) out[g] = C.GRUPOS[g];
+    for (const t of top5().top) for (const b of t.busquedas || t.modelos) { const [n, d] = grupoPersonal(b); out[n] = d; }
     return out;
   }
-  const gruposClasificacion = () => (C.BUSQUEDA_MODO === "personal" ? gruposPersonales() : C.GRUPOS);
+  const gruposClasificacion = () => (C.BUSQUEDA_MODO === "personal" ? gruposPersonales() : { ...C.GRUPOS, ...gruposActivos() });
   const grupo = (n) => C.GRUPOS[n] || gruposPersonales()[n] || grupoPersonal(n)[1];
 
   // ---------------------------------------------------------------- tarea en curso
@@ -536,9 +538,11 @@
       return {
         modo: C.BUSQUEDA_MODO, texto: C.BUSQUEDA_TEXTO,
         terminos: terminos().map((x) => ({ texto: x, modelo: modeloConocido(x), categoria: grupoPersonal(x)[1].cat })),
-        top5: t.top.map((a) => ({ articulo: a.articulo, motivos: a.motivos || [], puntuacion: a.puntuacion,
-          modelos: a.modelos.map((g) => ({ nombre: g, compra_max: ref[g]?.compra_max_local ?? null, rotacion: (a.rotaciones || {})[g] ?? null })) })),
-        top5_fecha: t.fecha, top5_origen: t.origen, activos: Object.keys(gruposActivos()), catalogo: Object.keys(C.GRUPOS), minutos: minutos(),
+        top5: t.top.map((a) => ({ articulo: a.articulo, motivos: a.motivos || [], puntuacion: a.puntuacion, rotacion: a.rotacion ?? null,
+          generico: !!a.generico, modelos: (a.busquedas || a.modelos).map((b, i) => { const n = grupoPersonal(b)[0];
+            const visible = (a.busquedas && a.modelos.length === a.busquedas.length) ? a.modelos[i] : n;
+            return { nombre: visible, compra_max: ref[n]?.compra_max_local ?? null }; }) })),
+        top5_fecha: t.fecha, top5_origen: t.origen, top5_fuente: t.fuente, activos: Object.keys(gruposActivos()), catalogo: Object.keys(C.GRUPOS), minutos: minutos(),
         alias: Object.fromEntries(Object.entries(C.GRUPOS).flatMap(([g, d]) => [normal(g), normal(d.q), quitaConsola(normal(d.q))].map((k) => [k, g]))),
       };
     },

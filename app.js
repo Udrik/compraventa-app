@@ -128,16 +128,13 @@ function pintarBusqueda() {
   const t = QB.top5;
   $("#qb-top5").innerHTML = !t.length ? `<p class="aviso">Todavía no hay top 5 calculado.</p>` : `<ol class="top5">${t.map((a) => `
       <li><b>${esc(a.articulo)}</b>${a.motivos?.length ? ` <span class="sub">— ${esc(a.motivos.join(", "))}</span>` : ""}
-        <div class="chips">${a.modelos.map((m) => `<span class="chip" title="${m.rotacion != null ? Math.round(m.rotacion * 100) + " % vendido o reservado en ~4 días" : ""}">${esc(m.nombre)}${m.compra_max > 0 ? ` <small>≤ ${m.compra_max} €</small>` : ""}</span>`).join("")}</div></li>`).join("")}</ol>
-    <p class="sub">${QB.top5_origen === "calculado" ? `Calculado en este equipo el ${fecha(QB.top5_fecha)}.` : "Top 5 de la investigación inicial con datos de Wallapop."}
-      Se basa en lo que se vende más rápido, el interés de los compradores, los anuncios nuevos al día, el margen y las gangas encontradas.
-      ${MOVIL ? "" : `<button class="enlace" id="btn-top5">🔄 Recalcular con datos de hoy (≈ 45 min)</button>`}</p>`;
-  $("#btn-top5")?.addEventListener("click", async () => {
-    if (!confirm("Recalcular el top 5 busca TODO el catálogo (42 modelos) y mide qué se vende antes. Tarda unos 45 minutos. ¿Empezar?")) return;
-    try { await api("/api/top5", {}); refrescarEstado(); toast("Recalculando el top 5…"); } catch (e) { error(e); }
-  });
+        ${a.rotacion != null ? ` <span class="chip">${Math.round(a.rotacion * 100)} % vendido o reservado en horas</span>` : ""}
+        <div class="chips">${a.generico ? `<span class="chip">Todo el artículo${a.modelos[0]?.compra_max > 0 ? ` <small>≤ ${a.modelos[0].compra_max} €</small>` : ""}</span>` :
+          a.modelos.map((m) => `<span class="chip">${esc(m.nombre)}${m.compra_max > 0 ? ` <small>≤ ${m.compra_max} €</small>` : ""}</span>`).join("")}</div></li>`).join("")}</ol>
+    <p class="sub">Según la ${esc(QB.top5_fuente || "investigación de demanda en Wallapop")}: los artículos con más demanda,
+      quitando lo poco práctico de comprar y revender por tamaño (carritos, bicicletas, muebles). Cada artículo incluye sus modelos más vendidos o buscados.</p>`;
   pintarTerminos();
-  $("#qb-estado").textContent = modo === "top5" ? `Se buscarán ${QB.top5.reduce((s, a) => s + a.modelos.length, 0)} modelos.` : "";
+  $("#qb-estado").textContent = modo === "top5" ? `Se buscarán ${QB.top5.length} artículos (${QB.top5.reduce((s, a) => s + a.modelos.length, 0)} búsquedas).` : "";
 }
 function pintarTerminos() {
   const lista = $("#qb-texto").value.split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean);
@@ -161,7 +158,7 @@ $("#btn-qb-guardar").addEventListener("click", async () => {
   try {
     QB = await api("/api/busqueda", { modo: modoElegido(), texto: $("#qb-texto").value });
     qbEditando = false; pintarBusqueda(); refrescarEstado();
-    toast(QB.modo === "top5" ? "Buscarás los 5 artículos más rentables ✅" : `Buscarás: ${QB.terminos.map((t) => t.modelo || t.texto).join(", ")} ✅`);
+    toast(QB.modo === "top5" ? "Buscarás los 5 artículos más vendidos ✅" : `Buscarás: ${QB.terminos.map((t) => t.modelo || t.texto).join(", ")} ✅`);
   } catch (e) { error(e); }
 });
 
@@ -612,7 +609,7 @@ function pintarConfigVig() {
   if (!$("#vig-intervalo").value) $("#vig-intervalo").value = "180";
   $("#vig-envios").checked = VIG.envios; $("#vig-auto").checked = VIG.auto; $("#vig-windows").checked = VIG.con_windows;
   $("#lbl-vig-windows").classList.toggle("oculto", !VIG.windows);
-  const modo = VIG.modo === "personal" ? "lo que has escrito" : "los 5 artículos más rentables";
+  const modo = VIG.modo === "personal" ? "lo que has escrito" : "los 5 artículos más vendidos";
   $("#vig-modelos").innerHTML = !VIG.modelos.length ? `<p class="aviso">No hay nada que vigilar. Elige qué buscar en Inicio.</p>` :
     `<p class="sub">Ahora vigila <b>${modo}</b>:</p><div class="chips">${VIG.modelos.map((m) => `<span class="chip ${m.vigilado ? "" : "apagado"}"
       title="${m.vigilado ? (m.compra_max > 0 ? "Compra máx. " + m.compra_max + " €" : "No suele salir rentable") : "Sin precio de referencia: haz una búsqueda completa"}">${esc(m.nombre)}${m.vigilado ? (m.compra_max > 0 ? ` <small>≤ ${m.compra_max} €</small>` : " <small>(no rentable)</small>") : " <small>⚠️ sin precio</small>"}</span>`).join("")}</div>
